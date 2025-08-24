@@ -1,0 +1,98 @@
+-- Tạo database
+CREATE DATABASE IF NOT EXISTS barbershop
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+-- Chọn database
+USE barbershop;
+
+-- Bảng user
+CREATE TABLE `user` (
+  user_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  username    VARCHAR(50)  NOT NULL UNIQUE,
+  `password`  VARCHAR(255) NOT NULL,
+  full_name   VARCHAR(100) NOT NULL,
+  phone       VARCHAR(15)  NOT NULL UNIQUE,
+  email       VARCHAR(100) NOT NULL UNIQUE,
+  role        ENUM('CUSTOMER','ADMIN') NOT NULL DEFAULT 'CUSTOMER',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Bảng employee
+CREATE TABLE employee (
+  employee_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  `name`          VARCHAR(100) NOT NULL,
+  phone           VARCHAR(15)  NOT NULL UNIQUE,
+  email           VARCHAR(100) NOT NULL UNIQUE,
+  work_start_time TIME         NOT NULL,
+  work_end_time   TIME         NOT NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT ck_emp_work_time CHECK (work_start_time < work_end_time)
+) ENGINE=InnoDB;
+
+-- Bảng service
+CREATE TABLE service (
+  service_id  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  `name`      VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+  price       DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+  duration    INT NOT NULL CHECK (duration > 0),
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Bảng schedule
+CREATE TABLE schedule (
+  schedule_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  employee_id BIGINT UNSIGNED NOT NULL,
+  work_date   DATE NOT NULL,
+  start_time  TIME NOT NULL,
+  end_time    TIME NOT NULL,
+  is_available BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_schedule_employee FOREIGN KEY (employee_id) REFERENCES employee(employee_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT ck_schedule_time CHECK (start_time < end_time),
+  UNIQUE (employee_id, work_date, start_time, end_time)
+) ENGINE=InnoDB;
+
+-- Bảng appointment
+CREATE TABLE appointment (
+  appointment_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id          BIGINT UNSIGNED NOT NULL,
+  employee_id      BIGINT UNSIGNED NOT NULL,
+  service_id       BIGINT UNSIGNED NOT NULL,
+  appointment_date DATE NOT NULL,
+  start_time       TIME NOT NULL,
+  end_time         TIME NOT NULL,
+  status           ENUM('BOOKED','CANCELLED','COMPLETED') NOT NULL DEFAULT 'BOOKED',
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_appt_user     FOREIGN KEY (user_id)     REFERENCES `user`(user_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT fk_appt_employee FOREIGN KEY (employee_id) REFERENCES employee(employee_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT fk_appt_service  FOREIGN KEY (service_id)  REFERENCES service(service_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT ck_appt_time CHECK (start_time < end_time)
+) ENGINE=InnoDB;
+
+-- Index cho appointment
+CREATE INDEX idx_appt_user      ON appointment(user_id);
+CREATE INDEX idx_appt_employee  ON appointment(employee_id);
+CREATE INDEX idx_appt_service   ON appointment(service_id);
+CREATE INDEX idx_appt_date_time ON appointment(appointment_date, start_time, end_time);
+CREATE INDEX idx_appt_status    ON appointment(status);
+CREATE UNIQUE INDEX uq_appt_emp_exact_slot ON appointment(employee_id, appointment_date, start_time, end_time);
+
+-- Bảng review
+CREATE TABLE review (
+  review_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  appointment_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  rating         INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment        TEXT,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_review_appt FOREIGN KEY (appointment_id) REFERENCES appointment(appointment_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
